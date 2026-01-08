@@ -1,5 +1,5 @@
+import org.gradle.api.JavaVersion
 import org.gradle.api.plugins.JavaPluginExtension
-import org.gradle.jvm.toolchain.JavaLanguageVersion
 
 plugins {
     id("org.jetbrains.kotlin.jvm") version "1.9.22" apply false
@@ -23,10 +23,9 @@ subprojects {
     apply(plugin = "io.spring.dependency-management")
     apply(plugin = "java")
 
-    extensions.configure<JavaPluginExtension> {
-        toolchain {
-            languageVersion.set(JavaLanguageVersion.of(21))
-        }
+    configure<JavaPluginExtension> {
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
 
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
