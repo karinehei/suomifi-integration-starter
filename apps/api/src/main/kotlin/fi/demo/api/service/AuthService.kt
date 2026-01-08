@@ -1,5 +1,6 @@
 package fi.demo.api.service
 
+import fi.demo.api.controller.AuthController
 import fi.demo.suomifi.client.SuomifiAdapter
 import fi.demo.suomifi.client.config.SuomifiClientProperties
 import org.slf4j.LoggerFactory
