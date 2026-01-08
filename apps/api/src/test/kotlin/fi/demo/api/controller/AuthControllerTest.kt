@@ -41,12 +41,10 @@ class AuthControllerTest(
             "http://localhost:8089/authorize?state=$state"
         }
         
-        // Mock audit service - use lenient to handle any parameter combination
-        lenient {
-            whenever(auditService.recordEvent(any(), any(), any())).thenAnswer { }
-            whenever(auditService.recordEvent(any(), any())).thenAnswer { }
-            whenever(auditService.recordEvent(any())).thenAnswer { }
-        }
+        // Mock audit service - handle all parameter combinations using doAnswer
+        doAnswer { }.whenever(auditService).recordEvent(any(), any(), any())
+        doAnswer { }.whenever(auditService).recordEvent(any(), any())
+        doAnswer { }.whenever(auditService).recordEvent(any())
         
         mockMvc.perform(post("/api/v1/auth/session"))
             .andExpect(status().isOk)
@@ -63,12 +61,10 @@ class AuthControllerTest(
         )
         whenever(authService.handleCallback(any(), any())).thenReturn(callbackResponse)
         
-        // Mock audit service - use lenient to handle any parameter combination
-        lenient {
-            whenever(auditService.recordEvent(any(), any(), any())).thenAnswer { }
-            whenever(auditService.recordEvent(any(), any())).thenAnswer { }
-            whenever(auditService.recordEvent(any())).thenAnswer { }
-        }
+        // Mock audit service - handle all parameter combinations using doAnswer
+        doAnswer { }.whenever(auditService).recordEvent(any(), any(), any())
+        doAnswer { }.whenever(auditService).recordEvent(any(), any())
+        doAnswer { }.whenever(auditService).recordEvent(any())
         
         mockMvc.perform(
             get("/api/v1/auth/callback")
