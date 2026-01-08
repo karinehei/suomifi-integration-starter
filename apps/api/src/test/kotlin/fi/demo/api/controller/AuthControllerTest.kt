@@ -41,8 +41,8 @@ class AuthControllerTest(
             "http://localhost:8089/authorize?state=$state"
         }
         
-        // Mock audit service - use doNothing with specific matchers
-        doNothing().whenever(auditService).recordEvent(anyString(), anyOrNull(), anyOrNull())
+        // Mock audit service - use anyOrNull for nullable parameters
+        doAnswer { }.`when`(auditService).recordEvent(anyString(), anyOrNull(), anyOrNull())
         
         mockMvc.perform(post("/api/v1/auth/session"))
             .andExpect(status().isOk)
@@ -59,8 +59,8 @@ class AuthControllerTest(
         )
         whenever(authService.handleCallback(any(), any())).thenReturn(callbackResponse)
         
-        // Mock audit service - use doNothing with specific matchers
-        doNothing().whenever(auditService).recordEvent(anyString(), anyOrNull(), anyOrNull())
+        // Mock audit service - use anyOrNull for nullable parameters
+        doAnswer { }.`when`(auditService).recordEvent(anyString(), anyOrNull(), anyOrNull())
         
         mockMvc.perform(
             get("/api/v1/auth/callback")
