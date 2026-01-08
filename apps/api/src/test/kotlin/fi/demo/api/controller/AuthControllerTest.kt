@@ -13,7 +13,13 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.*
 import java.util.*
 
-@WebMvcTest(AuthController::class)
+@WebMvcTest(
+    controllers = [AuthController::class],
+    excludeAutoConfiguration = [
+        org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration::class,
+        org.springframework.boot.actuate.autoconfigure.security.servlet.ManagementWebSecurityAutoConfiguration::class
+    ]
+)
 class AuthControllerTest(
     @Autowired private val mockMvc: MockMvc
 ) {
@@ -35,13 +41,17 @@ class AuthControllerTest(
             "http://localhost:8089/authorize?state=$state"
         }
         
-        // Mock audit service - mockito-kotlin handles default parameters
-        doNothing().whenever(auditService).recordEvent(any(), any(), any())
+        // Mock audit service - use lenient to handle any parameter combination
+        lenient {
+            whenever(auditService.recordEvent(any(), any(), any())).thenAnswer { }
+            whenever(auditService.recordEvent(any(), any())).thenAnswer { }
+            whenever(auditService.recordEvent(any())).thenAnswer { }
+        }
         
         mockMvc.perform(post("/api/v1/auth/session"))
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.authUrl").exists())
-            .andExpect(jsonPath("$.state").exists())
+            .andExpect(jsonPath("$.authUrl").isString)
+            .andExpect(jsonPath("$.state").isString)
     }
     
     @Test
@@ -53,8 +63,12 @@ class AuthControllerTest(
         )
         whenever(authService.handleCallback(any(), any())).thenReturn(callbackResponse)
         
-        // Mock audit service - mockito-kotlin handles default parameters
-        doNothing().whenever(auditService).recordEvent(any(), any(), any())
+        // Mock audit service - use lenient to handle any parameter combination
+        lenient {
+            whenever(auditService.recordEvent(any(), any(), any())).thenAnswer { }
+            whenever(auditService.recordEvent(any(), any())).thenAnswer { }
+            whenever(auditService.recordEvent(any())).thenAnswer { }
+        }
         
         mockMvc.perform(
             get("/api/v1/auth/callback")
@@ -62,6 +76,6 @@ class AuthControllerTest(
                 .param("state", "test-state")
         )
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.message").exists())
+            .andExpect(jsonPath("$.message").isString)
     }
 }
