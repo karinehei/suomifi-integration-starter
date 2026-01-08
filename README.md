@@ -395,7 +395,9 @@ Run integration tests against real endpoints (in staging environment first).
 
 ## 📄 License
 
-This is a demo repository for educational purposes.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+This is a demo repository for educational purposes. The code demonstrates integration patterns for Suomi.fi identity services but does not include any real Suomi.fi credentials or proprietary endpoints.
 
 ## 🤝 Contributing
 
@@ -406,6 +408,3 @@ This is a demo project. For production use, ensure:
 4. JWT validation uses Suomi.fi's JWKS endpoint
 5. Comprehensive integration tests are added
 
----
-
-**Built with ❤️ for Suomi.fi integration readiness demonstration**
