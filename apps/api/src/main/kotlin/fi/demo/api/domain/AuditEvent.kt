@@ -34,7 +34,8 @@ data class AuditEvent(
     @Column(name = "correlation_id", length = 255)
     val correlationId: String? = null,
     
-    @Column(columnDefinition = "jsonb")
     @JdbcTypeCode(SqlTypes.JSON)
+    // Note: columnDefinition removed to allow H2 compatibility in tests
+    // Production schema uses JSONB (see Flyway migration)
     val details: Map<String, Any>? = null
 )

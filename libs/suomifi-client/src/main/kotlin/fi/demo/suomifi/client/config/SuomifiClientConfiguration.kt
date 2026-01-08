@@ -82,14 +82,14 @@ class SuomifiClientConfiguration(
         return try {
             // Load client certificate and key (stubbed for demo - not used)
             @Suppress("UNUSED_VARIABLE")
-            val clientCert = loadCertificate(properties.clientCertificatePath!!)
+            val clientCert = loadCertificate(properties.clientCertificatePath)
             @Suppress("UNUSED_VARIABLE")
-            val clientKey = loadPrivateKey(properties.clientKeyPath!!)
+            val clientKey = loadPrivateKey(properties.clientKeyPath)
             
             // Load truststore (stubbed for demo - not used)
             @Suppress("UNUSED_VARIABLE")
             val truststore = loadTruststore(
-                properties.truststorePath!!,
+                properties.truststorePath,
                 properties.truststorePassword ?: "changeit"
             )
             

@@ -34,7 +34,9 @@ class DemoJwtDecoder(
             val claimsJson = decodeBase64Url(parts[1])
             
             // Parse JSON using Jackson
+            @Suppress("UNCHECKED_CAST")
             val header = objectMapper.readValue(headerJson, Map::class.java) as Map<String, Any>
+            @Suppress("UNCHECKED_CAST")
             val claims = objectMapper.readValue(claimsJson, Map::class.java) as Map<String, Any>
             
             // Check expiration
