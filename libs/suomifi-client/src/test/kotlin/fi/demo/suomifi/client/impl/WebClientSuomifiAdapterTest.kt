@@ -6,7 +6,6 @@ import com.github.tomakehurst.wiremock.core.WireMockConfiguration.options
 import fi.demo.suomifi.client.*
 import fi.demo.suomifi.client.config.SuomifiClientProperties
 import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -79,19 +78,20 @@ class WebClientSuomifiAdapterTest {
                 )
         )
         
-        assertThatThrownBy {
+        val exception = org.junit.jupiter.api.assertThrows<Throwable> {
             adapter.exchangeAuthorizationCode("invalid-code", "test-state")
-        }.satisfies { throwable ->
-            // Unwrap exception if needed (block() may wrap in ReactiveException)
-            val actualException = when {
-                throwable is SuomifiAuthException -> throwable
-                throwable.cause is SuomifiAuthException -> throwable.cause as SuomifiAuthException
-                throwable.cause?.cause is SuomifiAuthException -> throwable.cause?.cause as SuomifiAuthException
-                else -> throw AssertionError("Expected SuomifiAuthException but got: ${throwable.javaClass.name} with cause: ${throwable.cause?.javaClass?.name}", throwable)
-            }
-            assertThat(actualException).isInstanceOf(SuomifiAuthException::class.java)
-            assertThat(actualException.statusCode).isEqualTo(401)
         }
+        
+        // Unwrap exception if needed (block() may wrap in ReactiveException)
+        val actualException = when {
+            exception is SuomifiAuthException -> exception
+            exception.cause is SuomifiAuthException -> exception.cause as SuomifiAuthException
+            exception.cause?.cause is SuomifiAuthException -> exception.cause?.cause as SuomifiAuthException
+            else -> throw org.opentest4j.AssertionFailedError("Expected SuomifiAuthException but got: ${exception.javaClass.name} with cause: ${exception.cause?.javaClass?.name}")
+        }
+        
+        assertThat(actualException).isInstanceOf(SuomifiAuthException::class.java)
+        assertThat(actualException.statusCode).isEqualTo(401)
     }
     
     @Test
@@ -132,18 +132,19 @@ class WebClientSuomifiAdapterTest {
                 )
         )
         
-        assertThatThrownBy {
+        val exception = org.junit.jupiter.api.assertThrows<Throwable> {
             adapter.fetchVerifiedProfile("invalid-token")
-        }.satisfies { throwable ->
-            // Unwrap exception if needed (block() may wrap in ReactiveException)
-            val actualException = when {
-                throwable is SuomifiAuthException -> throwable
-                throwable.cause is SuomifiAuthException -> throwable.cause as SuomifiAuthException
-                throwable.cause?.cause is SuomifiAuthException -> throwable.cause?.cause as SuomifiAuthException
-                else -> throw AssertionError("Expected SuomifiAuthException but got: ${throwable.javaClass.name} with cause: ${throwable.cause?.javaClass?.name}", throwable)
-            }
-            assertThat(actualException).isInstanceOf(SuomifiAuthException::class.java)
-            assertThat(actualException.statusCode).isEqualTo(403)
         }
+        
+        // Unwrap exception if needed (block() may wrap in ReactiveException)
+        val actualException = when {
+            exception is SuomifiAuthException -> exception
+            exception.cause is SuomifiAuthException -> exception.cause as SuomifiAuthException
+            exception.cause?.cause is SuomifiAuthException -> exception.cause?.cause as SuomifiAuthException
+            else -> throw org.opentest4j.AssertionFailedError("Expected SuomifiAuthException but got: ${exception.javaClass.name} with cause: ${exception.cause?.javaClass?.name}")
+        }
+        
+        assertThat(actualException).isInstanceOf(SuomifiAuthException::class.java)
+        assertThat(actualException.statusCode).isEqualTo(403)
     }
 }

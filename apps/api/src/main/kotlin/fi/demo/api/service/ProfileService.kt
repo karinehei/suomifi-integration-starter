@@ -1,5 +1,6 @@
 package fi.demo.api.service
 
+import fi.demo.api.controller.ProfileController
 import fi.demo.suomifi.client.SuomifiAdapter
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
