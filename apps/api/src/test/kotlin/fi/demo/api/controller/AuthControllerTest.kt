@@ -4,8 +4,7 @@ import fi.demo.api.repository.AuditEventRepository
 import fi.demo.api.service.AuditService
 import fi.demo.api.service.AuthService
 import org.junit.jupiter.api.Test
-import org.mockito.kotlin.any
-import org.mockito.kotlin.whenever
+import org.mockito.kotlin.*
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
 import org.springframework.boot.test.mock.mockito.MockBean
@@ -30,8 +29,14 @@ class AuthControllerTest(
     
     @Test
     fun `should start session successfully`() {
-        val state = UUID.randomUUID().toString()
-        whenever(authService.generateAuthUrl(any())).thenReturn("http://localhost:8089/authorize?state=$state")
+        // Mock the service to return a valid auth URL for any state
+        whenever(authService.generateAuthUrl(any())).thenAnswer { invocation ->
+            val state = invocation.getArgument<String>(0)
+            "http://localhost:8089/authorize?state=$state"
+        }
+        
+        // Mock audit service - mockito-kotlin handles default parameters
+        doNothing().whenever(auditService).recordEvent(any(), any(), any())
         
         mockMvc.perform(post("/api/v1/auth/session"))
             .andExpect(status().isOk)
@@ -47,6 +52,9 @@ class AuthControllerTest(
             profile = mapOf("givenName" to "Test")
         )
         whenever(authService.handleCallback(any(), any())).thenReturn(callbackResponse)
+        
+        // Mock audit service - mockito-kotlin handles default parameters
+        doNothing().whenever(auditService).recordEvent(any(), any(), any())
         
         mockMvc.perform(
             get("/api/v1/auth/callback")

@@ -14,28 +14,40 @@ import java.util.*
  */
 @Entity
 @Table(name = "audit_event")
-data class AuditEvent(
+class AuditEvent(
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    val id: UUID = UUID.randomUUID(),
+    var id: UUID = UUID.randomUUID(),
     
     @Column(nullable = false, updatable = false)
-    val ts: Instant = Instant.now(),
+    var ts: Instant = Instant.now(),
     
     @Column(nullable = false, length = 255)
-    val actor: String, // JWT subject or "anonymous"
+    var actor: String = "", // JWT subject or "anonymous"
     
     @Column(nullable = false, length = 100)
-    val action: String, // e.g., "AUTH_SESSION_STARTED", "PROFILE_FETCHED"
+    var action: String = "", // e.g., "AUTH_SESSION_STARTED", "PROFILE_FETCHED"
     
     @Column(length = 255)
-    val target: String? = null, // e.g., resource ID or endpoint
+    var target: String? = null, // e.g., resource ID or endpoint
     
     @Column(name = "correlation_id", length = 255)
-    val correlationId: String? = null,
+    var correlationId: String? = null,
     
     @JdbcTypeCode(SqlTypes.JSON)
     // Note: columnDefinition removed to allow H2 compatibility in tests
     // Production schema uses JSONB (see Flyway migration)
-    val details: Map<String, Any>? = null
-)
+    var details: Map<String, Any>? = null
+) {
+    // No-arg constructor for Hibernate
+    @Suppress("unused")
+    constructor() : this(
+        UUID.randomUUID(),
+        Instant.now(),
+        "",
+        "",
+        null,
+        null,
+        null
+    )
+}
