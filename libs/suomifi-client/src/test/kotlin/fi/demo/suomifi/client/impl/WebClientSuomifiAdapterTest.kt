@@ -13,7 +13,6 @@ import org.junit.jupiter.api.Test
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.web.reactive.function.client.WebClient
-import reactor.core.Exceptions
 
 class WebClientSuomifiAdapterTest {
     
@@ -83,13 +82,12 @@ class WebClientSuomifiAdapterTest {
         assertThatThrownBy {
             adapter.exchangeAuthorizationCode("invalid-code", "test-state")
         }.satisfies { throwable ->
-            // Unwrap ReactiveException if needed
+            // Unwrap exception if needed (block() may wrap in ReactiveException)
             val actualException = when {
                 throwable is SuomifiAuthException -> throwable
                 throwable.cause is SuomifiAuthException -> throwable.cause as SuomifiAuthException
-                throwable is Exceptions.ReactiveException && throwable.cause is SuomifiAuthException -> 
-                    throwable.cause as SuomifiAuthException
-                else -> throw AssertionError("Expected SuomifiAuthException but got: ${throwable.javaClass.name}", throwable)
+                throwable.cause?.cause is SuomifiAuthException -> throwable.cause?.cause as SuomifiAuthException
+                else -> throw AssertionError("Expected SuomifiAuthException but got: ${throwable.javaClass.name} with cause: ${throwable.cause?.javaClass?.name}", throwable)
             }
             assertThat(actualException).isInstanceOf(SuomifiAuthException::class.java)
             assertThat(actualException.statusCode).isEqualTo(401)
@@ -137,13 +135,12 @@ class WebClientSuomifiAdapterTest {
         assertThatThrownBy {
             adapter.fetchVerifiedProfile("invalid-token")
         }.satisfies { throwable ->
-            // Unwrap ReactiveException if needed
+            // Unwrap exception if needed (block() may wrap in ReactiveException)
             val actualException = when {
                 throwable is SuomifiAuthException -> throwable
                 throwable.cause is SuomifiAuthException -> throwable.cause as SuomifiAuthException
-                throwable is Exceptions.ReactiveException && throwable.cause is SuomifiAuthException -> 
-                    throwable.cause as SuomifiAuthException
-                else -> throw AssertionError("Expected SuomifiAuthException but got: ${throwable.javaClass.name}", throwable)
+                throwable.cause?.cause is SuomifiAuthException -> throwable.cause?.cause as SuomifiAuthException
+                else -> throw AssertionError("Expected SuomifiAuthException but got: ${throwable.javaClass.name} with cause: ${throwable.cause?.javaClass?.name}", throwable)
             }
             assertThat(actualException).isInstanceOf(SuomifiAuthException::class.java)
             assertThat(actualException.statusCode).isEqualTo(403)
