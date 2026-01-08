@@ -1,0 +1,50 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# IntelliJ IDEA
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+# VS Code
+.vscode/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Application
+application-local.yml
+application-local.properties
+
+# Certificates and keys (never commit real ones)
+*.p12
+*.jks
+*.pem
+*.key
+*.crt
+*.cer
+!**/src/test/resources/**/*.pem
+!**/src/test/resources/**/*.key
+
+# Docker
+docker-compose.override.yml

@@ -1,0 +1,18 @@
+{
+  "request": {
+    "method": "GET",
+    "url": "/verified-profile",
+    "headers": {
+      "Authorization": {
+        "matches": "Bearer .+"
+      }
+    }
+  },
+  "response": {
+    "status": 200,
+    "headers": {
+      "Content-Type": "application/json"
+    },
+    "body": "{\n  \"nationalIdentifier\": \"123456-****\",\n  \"givenName\": \"Matti\",\n  \"familyName\": \"Meikäläinen\",\n  \"dateOfBirth\": \"1990-05-15\",\n  \"assuranceLevel\": \"substantial\",\n  \"email\": \"matti.meikalainen@example.com\"\n}"
+  }
+}
