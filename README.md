@@ -136,10 +136,17 @@ Key configuration in `apps/api/src/main/resources/application.yml`:
 ```yaml
 suomifi:
   client:
-    base-url: http://wiremock:8080  # WireMock stub URL
-    client-id: demo-client-id
-    client-secret: demo-client-secret
-    redirect-uri: http://localhost:8080/api/v1/auth/callback
+    base-url: ${SUOMIFI_BASE_URL:http://wiremock:8080}  # WireMock stub URL
+      # Note: In Docker Compose, use http://wiremock:8080 (internal port)
+      # For local dev without Docker, use http://localhost:8089 (external port)
+    client-id: ${SUOMIFI_CLIENT_ID:demo-client-id}
+    client-secret: ${SUOMIFI_CLIENT_SECRET:demo-client-secret}
+    redirect-uri: ${SUOMIFI_REDIRECT_URI:http://localhost:8080/api/v1/auth/callback}
+    connect-timeout-seconds: 10
+    read-timeout-seconds: 30
+    retry-enabled: true
+    max-retry-attempts: 3
+    retry-initial-delay-ms: 500
     # mTLS configuration (for production):
     # client-certificate-path: classpath:certificates/client.pem
     # client-key-path: classpath:certificates/client-key.pem
@@ -217,6 +224,11 @@ To switch to real Suomi.fi integration:
 ./gradlew test
 ```
 
+This runs:
+- Unit tests for the `suomifi-client` library (using WireMock)
+- Controller tests (using `@WebMvcTest` with mocked services)
+- Integration tests (using `@SpringBootTest` with H2 in-memory database)
+
 ### Run Integration Tests
 
 ```bash
@@ -230,6 +242,8 @@ The full stack runs in Docker Compose for integration testing:
 ```bash
 docker compose -f infra/docker-compose.yml up --build
 ```
+
+**Note**: Unit and integration tests use H2 in-memory database for speed and isolation. The Docker Compose setup is for manual testing and end-to-end validation.
 
 ## 📊 Observability
 
@@ -354,6 +368,8 @@ Run integration tests against real endpoints (in staging environment first).
    ```bash
    docker run -d -p 8089:8080 -v $(pwd)/infra/wiremock/mappings:/home/wiremock/mappings wiremock/wiremock:latest
    ```
+   
+   Note: When running locally (not in Docker Compose), use `http://localhost:8089` for the base URL.
 
 3. Run API:
    ```bash
@@ -369,9 +385,13 @@ Run integration tests against real endpoints (in staging environment first).
 ## 📝 Notes
 
 - **No Real Credentials**: This repository contains no real Suomi.fi credentials or proprietary endpoints
-- **Demo JWT**: The JWT decoder accepts unsigned tokens for local testing only
+- **Demo JWT**: The JWT decoder accepts unsigned tokens for local testing only (see `DemoJwtDecoder`)
 - **mTLS Stub**: mTLS configuration is scaffolded but not fully implemented (would require proper KeyManager/TrustManager setup)
 - **Production Ready**: Core patterns are production-ready; replace stubs with real implementations
+- **WireMock Ports**: 
+  - External (host): `http://localhost:8089`
+  - Internal (Docker): `http://wiremock:8080`
+  - The default configuration uses the internal Docker port for containerized deployments
 
 ## 📄 License
 

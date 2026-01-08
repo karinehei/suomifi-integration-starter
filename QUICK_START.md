@@ -85,7 +85,14 @@ SELECT * FROM audit_event ORDER BY ts DESC LIMIT 10;
 ### API not connecting to database
 - Wait for PostgreSQL to be healthy (check logs)
 - Verify environment variables in docker-compose.yml
+- Check database connection: `docker exec -it suomifi-postgres psql -U suomifi_user -d suomifi_db -c "SELECT 1;"`
 
 ### WireMock not responding
 - Check WireMock logs: `docker logs suomifi-wiremock`
 - Verify mappings are loaded: `curl http://localhost:8089/__admin/mappings`
+- Test WireMock directly: `curl http://localhost:8089/oauth/token` (should return 404 or error, not connection refused)
+
+### Build failures
+- Ensure Java 21 is installed: `java -version`
+- Clean and rebuild: `./gradlew clean build`
+- Check for port conflicts if tests fail

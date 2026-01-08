@@ -89,10 +89,14 @@ A reusable library that implements the adapter pattern for Suomi.fi integration.
 
 **Schema:**
 - `audit_event` table stores all audit logs with JSONB details field
+- Entity uses regular class (not data class) for Hibernate compatibility
+- Includes no-arg constructor for JPA requirements
 
 **Migrations:**
 - Managed by Flyway
 - Located in `apps/api/src/main/resources/db/migration/`
+- Production uses JSONB column type
+- Tests use H2 with compatible schema (JSONB mapped to JSON/CLOB)
 
 ### WireMock Stub
 
@@ -173,10 +177,16 @@ To switch to real Suomi.fi:
 
 ## Testing Strategy
 
-1. **Unit Tests**: Test adapter with MockWebServer/WireMock
-2. **Integration Tests**: Test API with Testcontainers (PostgreSQL)
+1. **Unit Tests**: 
+   - Adapter tests using WireMock standalone
+   - Controller tests using `@WebMvcTest` with mocked services
+   - All tests use H2 in-memory database for speed
+2. **Integration Tests**: 
+   - Full Spring Boot context with `@SpringBootTest`
+   - H2 database for test isolation
+   - MockMvc for HTTP testing
 3. **Local Testing**: Full stack via Docker Compose
-4. **CI/CD**: Automated tests in GitHub Actions
+4. **CI/CD**: Automated tests in GitHub Actions with PostgreSQL service container
 
 ## Deployment
 

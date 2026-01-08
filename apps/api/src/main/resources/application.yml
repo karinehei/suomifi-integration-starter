@@ -44,7 +44,7 @@ management:
 # Suomi.fi client configuration
 suomifi:
   client:
-    base-url: ${SUOMIFI_BASE_URL:http://wiremock:8089}
+    base-url: ${SUOMIFI_BASE_URL:http://wiremock:8080}  # Docker internal port; use localhost:8089 for local dev
     client-id: ${SUOMIFI_CLIENT_ID:demo-client-id}
     client-secret: ${SUOMIFI_CLIENT_SECRET:demo-client-secret}
     redirect-uri: ${SUOMIFI_REDIRECT_URI:http://localhost:8080/api/v1/auth/callback}

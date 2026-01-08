@@ -49,7 +49,7 @@ services:
       DB_NAME: suomifi_db
       DB_USER: suomifi_user
       DB_PASSWORD: suomifi_pass
-      SUOMIFI_BASE_URL: http://wiremock:8080
+      SUOMIFI_BASE_URL: http://wiremock:8080  # Internal Docker port (8080), external is 8089
     ports:
       - "8080:8080"
     healthcheck:
