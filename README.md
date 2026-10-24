@@ -1,5 +1,11 @@
 # Suomi.fi Integration Starter
 
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
+[![CI](https://github.com/karinehei/suomifi-integration-starter/actions/workflows/ci.yml/badge.svg)](https://github.com/karinehei/suomifi-integration-starter/actions/workflows/ci.yml)
+[![Kotlin](https://img.shields.io/badge/Kotlin-1.9-7F52FF?logo=kotlin&logoColor=white)](https://kotlinlang.org/)
+[![Java](https://img.shields.io/badge/Java-21-ED8B00?logo=openjdk&logoColor=white)](https://openjdk.org/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.2-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+
 Educational prototype of an identity-integration adapter. It is a portfolio project for learning OAuth-style flows, adapter boundaries, correlation IDs, and audit logging. It is not a production integration and it is not connected to Suomi.fi.
 
 The Kotlin API talks to local stubs. A separate browser demo under `web/` simulates the same ideas without starting Java, PostgreSQL, WireMock, or an identity provider.
@@ -186,4 +192,4 @@ docs/architecture.md  Backend and demo boundaries
 
 ## License
 
-MIT. See [LICENSE](LICENSE). This is an educational prototype. It contains demo placeholders only.
+Apache License 2.0. See [LICENSE](LICENSE). This is an educational prototype. It contains demo placeholders only.
