@@ -1,410 +1,189 @@
 # Suomi.fi Integration Starter
 
-A production-ready demo repository showcasing integration readiness for Suomi.fi identity services. This project demonstrates enterprise-grade patterns for integrating with Suomi.fi's OAuth2/OIDC-based identity platform, including mTLS configuration, audit logging, observability, and comprehensive error handling.
+Educational prototype of an identity-integration adapter. It is a portfolio project for learning OAuth-style flows, adapter boundaries, correlation IDs, and audit logging. It is not a production integration and it is not connected to Suomi.fi.
 
-## 🎯 What This Demonstrates
+The Kotlin API talks to local stubs. A separate browser demo under `web/` simulates the same ideas without starting Java, PostgreSQL, WireMock, or an identity provider.
 
-This repository showcases:
+## Browser demo
 
-- **Adapter Pattern**: Clean separation between stub and production implementations
-- **mTLS-Ready Configuration**: HTTP client configured for mutual TLS authentication
-- **OAuth2/OIDC Flow**: Complete authentication flow with token exchange and profile retrieval
-- **Security Best Practices**: JWT validation, correlation IDs, audit logging
-- **Observability**: Structured logging, correlation ID propagation, audit trail
-- **Production Patterns**: Error handling, retries, configuration management
-- **Testing**: Integration tests with WireMock and Testcontainers
+The Identity Integration Explorer is a static React app. It shows a simulated session, fictional personas, failure scenarios, example HTTP records, and a local audit trail. Simulated authentication never leaves the browser.
 
-## 🏗️ Architecture
+Limitations:
 
-This project follows a modular architecture:
+- It does not authenticate users, validate identities, or provide production security.
+- It does not call this repository's API, WireMock, or any external identity service.
+- Placeholder codes and tokens are nonfunctional. They are not credentials.
+- Persona identifiers look like `DEMO-PERSON-001`. They are not personal identity codes.
+- The page is an independent portfolio demo. It does not use official Suomi.fi branding and it is not endorsed by any authority.
 
+### Local commands
+
+From `web/`:
+
+```bash
+npm ci
+npm test
+npm run dev
+npm run build:demo
+npm run preview:demo
 ```
-apps/api              - Spring Boot REST API service
-libs/suomifi-client   - Reusable Suomi.fi adapter library
-infra/                - Docker Compose and WireMock stubs
+
+- `npm run dev` serves the app at http://127.0.0.1:5173/suomifi-integration-starter/
+- `npm run build:demo` typechecks and writes the Pages bundle to `web/dist`
+- `npm run preview:demo` serves that bundle at http://127.0.0.1:4173/suomifi-integration-starter/
+
+The Vite base path is `/suomifi-integration-starter/`. Routes use the URL hash, for example `#/audit`.
+
+### GitHub Pages
+
+Hosting has not been enabled or deployed by this change. To publish later:
+
+1. In the GitHub repository, open Settings → Pages → Build and deployment, and set Source to GitHub Actions.
+2. Run `.github/workflows/pages.yml` manually from the Actions tab. The workflow trigger is `workflow_dispatch` only.
+3. The workflow uses Node 22, runs `npm ci`, `npm test`, and `npm run build:demo` in `web/`, then uploads only `web/dist`.
+4. Expected URL after a successful manual run: https://karinehei.github.io/suomifi-integration-starter/
+
+The workflow does not publish the repository root, backend configuration, certificates, or environment secrets. The existing backend workflow in `.github/workflows/ci.yml` is unchanged.
+
+## What the backend actually does
+
+`apps/api` is a Kotlin Spring Boot service. `libs/suomifi-client` is an adapter that calls whatever base URL is configured. In local Docker that URL is WireMock.
+
+Implemented:
+
+- `POST /api/v1/auth/session` returns a random `state` and an authorization URL built from `suomifi.client.base-url`.
+- `GET /api/v1/auth/callback` exchanges a code at `{baseUrl}/oauth/token` and fetches `{baseUrl}/verified-profile`.
+- `GET /api/v1/profile` requires a bearer token that `DemoJwtDecoder` can parse.
+- `GET /api/v1/health` reports the process status.
+- `X-Correlation-Id` is read or generated and stored on audit rows.
+- Audit rows are written to PostgreSQL through Flyway's `audit_event` table when the API is running against Postgres.
+- The adapter maps HTTP 401 and 403 to `SuomifiAuthException`, and retries HTTP 5xx responses with a fixed delay.
+
+Not implemented, despite earlier wording in this file:
+
+- JWT signature verification. `DemoJwtDecoder` base64url-decodes the header and payload and, when `exp` is present, rejects an expired instant. It does not check the signature. `scripts/generate-jwt.ps1` appends the literal `signature-placeholder`.
+- Callback state checks. The API generates and logs `state`. `AuthService.handleCallback` does not store or compare it. The adapter does not send `state` to the token endpoint.
+- ID-token validation. `TokenResponse` and the WireMock fixture include `id_token`. The callback response drops it. The authorization URL has no `nonce`.
+- mTLS. Certificate properties exist. `buildSslContext` returns null, and private-key loading throws `UnsupportedOperationException`. The WebClient uses plain HTTP.
+- A real Suomi.fi client. Paths `/authorize`, `/oauth/token`, and `/verified-profile` are local stub shapes. WireMock has no `/authorize` mapping.
+- Connection-error retries. The retry predicate names `SuomifiNetworkException`, but that type is applied after the retry operator, so connection failures are not retried. The delay is fixed, not exponential.
+- A browser client for the API. Swagger and curl are the existing clients. The new `web/` app does not call them.
+
+`ProfileService` does not use the caller's JWT as an access token. It calls the stub with the fixed placeholder `demo-access-token`.
+
+## Backend quick start
+
+Prerequisites: Java 21, Docker, and the included Gradle wrapper.
+
+```bash
+docker compose -f infra/docker-compose.yml up -d
+docker compose -f infra/docker-compose.yml logs -f
+curl http://localhost:8080/api/v1/health
 ```
 
-See [docs/architecture.md](docs/architecture.md) for detailed architecture documentation.
+Swagger UI: http://localhost:8080/swagger-ui.html
 
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Java 21
-- Docker and Docker Compose
-- Gradle 8.5+ (wrapper included)
-
-### Running Locally
-
-1. **Start all services** (PostgreSQL, WireMock, API):
-   ```bash
-   docker compose -f infra/docker-compose.yml up -d
-   ```
-
-2. **Wait for services to be healthy** (check logs):
-   ```bash
-   docker compose -f infra/docker-compose.yml logs -f
-   ```
-
-3. **Verify API is running**:
-   ```bash
-   curl http://localhost:8080/api/v1/health
-   ```
-
-4. **Access Swagger UI**:
-   Open http://localhost:8080/swagger-ui.html in your browser
-
-### Testing the API
-
-#### 1. Start an Authentication Session
+Start a stub session:
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/auth/session
 ```
 
-Response:
-```json
-{
-  "authUrl": "http://localhost:8089/authorize?response_type=code&client_id=demo-client-id&redirect_uri=http://localhost:8080/api/v1/auth/callback&state=<state>&scope=openid profile",
-  "state": "<state-uuid>"
-}
-```
+The response contains `authUrl` and `state`. `authUrl` points at the configured base URL. With Docker that is WireMock, not Suomi.fi.
 
-#### 2. Handle OAuth Callback
+Callback, using the `state` from the previous response and any code the token stub accepts:
 
 ```bash
-curl "http://localhost:8080/api/v1/auth/callback?code=test-code&state=<state-from-step-1>"
+curl "http://localhost:8080/api/v1/auth/callback?code=test-code&state=<state-from-the-session-response>"
 ```
 
-Response:
-```json
-{
-  "message": "Authentication successful",
-  "accessToken": "...",
-  "profile": {
-    "givenName": "Matti",
-    "familyName": "Meikäläinen",
-    "dateOfBirth": "1990-05-15",
-    "nationalIdentifier": "123456-****",
-    "assuranceLevel": "substantial"
-  }
-}
-```
+The callback does not check that `state` matches a stored value. A matching `state` in this example only shows the query shape.
 
-#### 3. Get Profile (Requires JWT)
+Profile route, after generating an unsigned demo token:
 
-First, generate a JWT token:
-
-**Windows (PowerShell):**
 ```powershell
 .\scripts\generate-jwt.ps1
 ```
 
-**Linux/Mac:**
 ```bash
-chmod +x scripts/generate-jwt.sh
-./scripts/generate-jwt.sh
+curl -H "Authorization: Bearer <token-from-the-script>" http://localhost:8080/api/v1/profile
 ```
 
-**Kotlin:**
-```bash
-kotlin scripts/generate-jwt.kt
-```
+The script does not sign the token. `DemoJwtDecoder` accepts that shape when `exp` is still in the future. The profile body comes from the WireMock fixture via the placeholder access token inside `ProfileService`.
 
-Then use the token:
-```bash
-curl -H "Authorization: Bearer <token-from-script>" http://localhost:8080/api/v1/profile
-```
+### API routes
 
-## 📋 API Endpoints
+| Method | Route | Auth in this codebase |
+| --- | --- | --- |
+| GET | `/api/v1/health` | Open |
+| POST | `/api/v1/auth/session` | Open |
+| GET | `/api/v1/auth/callback` | Open |
+| GET | `/api/v1/profile` | Bearer token parsed by `DemoJwtDecoder` |
 
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| GET | `/api/v1/health` | Health check | No |
-| POST | `/api/v1/auth/session` | Start auth session | No |
-| GET | `/api/v1/auth/callback` | OAuth callback handler | No |
-| GET | `/api/v1/profile` | Get verified profile | Yes (JWT) |
+### Run the API without Compose
 
-See Swagger UI at http://localhost:8080/swagger-ui.html for detailed API documentation.
+1. Start PostgreSQL on port 5432 with database `suomifi_db`, user `suomifi_user`, and password `suomifi_pass`.
+2. Start WireMock with `infra/wiremock/mappings` mounted, published on port 8089.
+3. Run `./gradlew :apps:api:bootRun` with `SUOMIFI_BASE_URL=http://localhost:8089`.
 
-## 🔧 Configuration
+`application-local.yml` points the client at `http://localhost:8089`. The default `application.yml` value `http://wiremock:8080` is the Docker network name.
 
-### Application Properties
-
-Key configuration in `apps/api/src/main/resources/application.yml`:
-
-```yaml
-suomifi:
-  client:
-    base-url: ${SUOMIFI_BASE_URL:http://wiremock:8080}  # WireMock stub URL
-      # Note: In Docker Compose, use http://wiremock:8080 (internal port)
-      # For local dev without Docker, use http://localhost:8089 (external port)
-    client-id: ${SUOMIFI_CLIENT_ID:demo-client-id}
-    client-secret: ${SUOMIFI_CLIENT_SECRET:demo-client-secret}
-    redirect-uri: ${SUOMIFI_REDIRECT_URI:http://localhost:8080/api/v1/auth/callback}
-    connect-timeout-seconds: 10
-    read-timeout-seconds: 30
-    retry-enabled: true
-    max-retry-attempts: 3
-    retry-initial-delay-ms: 500
-    # mTLS configuration (for production):
-    # client-certificate-path: classpath:certificates/client.pem
-    # client-key-path: classpath:certificates/client-key.pem
-    # truststore-path: classpath:certificates/truststore.jks
-    # truststore-password: ${TRUSTSTORE_PASSWORD}
-```
-
-### Environment Variables
-
-Override via environment variables:
-
-- `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` - Database connection
-- `SUOMIFI_BASE_URL` - Suomi.fi service base URL
-- `SUOMIFI_CLIENT_ID`, `SUOMIFI_CLIENT_SECRET` - OAuth2 credentials
-- `SERVER_PORT` - API server port (default: 8080)
-
-## 🔒 Security
-
-### Current Implementation (Demo)
-
-- **JWT Decoder**: Simple demo decoder that accepts unsigned tokens (for testing only)
-- **No mTLS**: Plain HTTP to WireMock stub
-- **No Real Credentials**: All credentials are demo values
-
-### Production Requirements
-
-To switch to real Suomi.fi integration:
-
-1. **Update Base URL**:
-   ```yaml
-   suomifi:
-     client:
-       base-url: https://api.suomi.fi  # Real Suomi.fi endpoint
-   ```
-
-2. **Configure mTLS Certificates**:
-   ```yaml
-   suomifi:
-     client:
-       client-certificate-path: file:/path/to/client.pem
-       client-key-path: file:/path/to/client-key.pem
-       truststore-path: file:/path/to/truststore.jks
-       truststore-password: ${TRUSTSTORE_PASSWORD}
-   ```
-
-3. **Replace JWT Decoder**:
-   - Remove `DemoJwtDecoder`
-   - Configure Spring Security to use Suomi.fi JWKS endpoint:
-     ```kotlin
-     oauth2ResourceServer {
-         jwt {
-             jwkSetUri = "https://api.suomi.fi/.well-known/jwks.json"
-         }
-     }
-     ```
-
-4. **Set Real OAuth2 Credentials**:
-   - Obtain client ID and secret from Suomi.fi
-   - Store securely (e.g., HashiCorp Vault, AWS Secrets Manager)
-   - Never commit to repository
-
-### Security Features
-
-- ✅ **Correlation IDs**: Every request gets a correlation ID for tracing
-- ✅ **Audit Logging**: All actions logged to database
-- ✅ **JWT Validation**: Tokens validated before access
-- ✅ **State Parameter**: CSRF protection in OAuth flow
-- ✅ **Error Handling**: Typed exceptions, no sensitive data in errors
-
-## 🧪 Testing
-
-### Run All Tests
+### Tests and build
 
 ```bash
 ./gradlew test
-```
-
-This runs:
-- Unit tests for the `suomifi-client` library (using WireMock)
-- Controller tests (using `@WebMvcTest` with mocked services)
-- Integration tests (using `@SpringBootTest` with H2 in-memory database)
-
-### Run Integration Tests
-
-```bash
-./gradlew :apps:api:test --tests "*IntegrationTest"
-```
-
-### Test with Docker Compose
-
-The full stack runs in Docker Compose for integration testing:
-
-```bash
-docker compose -f infra/docker-compose.yml up --build
-```
-
-**Note**: Unit and integration tests use H2 in-memory database for speed and isolation. The Docker Compose setup is for manual testing and end-to-end validation.
-
-## 📊 Observability
-
-### Logging
-
-Structured logging with correlation IDs:
-
-```
-2024-01-15 10:30:45 [http-nio-8080-exec-1] INFO  [abc-123-def] fi.demo.api.controller.AuthController - Starting authentication session
-```
-
-Correlation ID is:
-- Extracted from `X-Correlation-Id` header (or generated if missing)
-- Added to MDC for automatic inclusion in logs
-- Returned in response headers
-- Stored in audit events
-
-### Audit Trail
-
-All actions are logged to `audit_event` table:
-
-```sql
-SELECT * FROM audit_event ORDER BY ts DESC LIMIT 10;
-```
-
-Fields:
-- `id` - UUID
-- `ts` - Timestamp
-- `actor` - User identifier (from JWT subject or "anonymous")
-- `action` - Action type (e.g., "AUTH_SESSION_STARTED")
-- `target` - Target resource (optional)
-- `correlation_id` - Request correlation ID
-- `details` - JSONB metadata
-
-### Health Checks
-
-- API: `GET /api/v1/health`
-- Actuator: `GET /actuator/health`
-
-## 🏭 CI/CD
-
-GitHub Actions workflow (`.github/workflows/ci.yml`):
-- Builds on push/PR to main/develop
-- Runs tests with PostgreSQL Testcontainers
-- Uploads test results and build artifacts
-
-## 📁 Project Structure
-
-```
-.
-├── apps/
-│   └── api/                    # Spring Boot API service
-│       ├── src/main/kotlin/    # Source code
-│       ├── src/main/resources/ # Config, migrations
-│       └── Dockerfile
-├── libs/
-│   └── suomifi-client/         # Suomi.fi adapter library
-│       ├── src/main/kotlin/    # Adapter implementation
-│       └── src/test/kotlin/    # Unit tests
-├── infra/
-│   ├── docker-compose.yml      # Local dev stack
-│   └── wiremock/
-│       └── mappings/           # WireMock stub definitions
-├── scripts/
-│   └── generate-jwt.*          # JWT generator scripts
-├── docs/
-│   └── architecture.md         # Architecture documentation
-└── README.md                   # This file
-```
-
-## 🔄 Switching from Stub to Real Suomi.fi
-
-### Step 1: Update Configuration
-
-Edit `apps/api/src/main/resources/application.yml` or set environment variables:
-
-```yaml
-suomifi:
-  client:
-    base-url: https://api.suomi.fi  # Real endpoint
-    client-id: ${SUOMIFI_CLIENT_ID}  # From secure storage
-    client-secret: ${SUOMIFI_CLIENT_SECRET}  # From secure storage
-```
-
-### Step 2: Configure mTLS
-
-Place certificates in secure location and configure paths:
-
-```yaml
-suomifi:
-  client:
-    client-certificate-path: file:/secure/certs/client.pem
-    client-key-path: file:/secure/certs/client-key.pem
-    truststore-path: file:/secure/certs/truststore.jks
-    truststore-password: ${TRUSTSTORE_PASSWORD}
-```
-
-### Step 3: Update JWT Decoder
-
-Replace `DemoJwtDecoder` in `SecurityConfiguration` with JWKS-based validation.
-
-### Step 4: Test
-
-Run integration tests against real endpoints (in staging environment first).
-
-## 🛠️ Development
-
-### Building
-
-```bash
 ./gradlew build
 ```
 
-### Running Locally (without Docker)
+Controller and integration tests use H2. Flyway is disabled in `application-test.yml`. Testcontainers is on the test classpath, and CI starts a PostgreSQL service container, but the inspected tests do not launch Testcontainers. `./gradlew test` was not run for the browser-demo change because the Kotlin sources were not modified.
 
-1. Start PostgreSQL:
-   ```bash
-   docker run -d -p 5432:5432 -e POSTGRES_DB=suomifi_db -e POSTGRES_USER=suomifi_user -e POSTGRES_PASSWORD=suomifi_pass postgres:16-alpine
-   ```
+## Configuration
 
-2. Start WireMock:
-   ```bash
-   docker run -d -p 8089:8080 -v $(pwd)/infra/wiremock/mappings:/home/wiremock/mappings wiremock/wiremock:latest
-   ```
-   
-   Note: When running locally (not in Docker Compose), use `http://localhost:8089` for the base URL.
+Values in `apps/api/src/main/resources/application.yml` are local placeholders:
 
-3. Run API:
-   ```bash
-   ./gradlew :apps:api:bootRun
-   ```
+- `suomifi.client.base-url` defaults to `http://wiremock:8080` inside Compose and should be `http://localhost:8089` for a host-run WireMock.
+- `client-id` defaults to `demo-client-id`.
+- `client-secret` defaults to `demo-client-secret`.
+- `redirect-uri` defaults to `http://localhost:8080/api/v1/auth/callback`.
 
-### Code Style
+Replacing the base URL and these placeholders does not create a working Suomi.fi integration. A real relying party has to register metadata, implement the provider's current protocol, validate tokens, store browser state, and handle errors. Those steps are not done here. The commented certificate paths do not turn on mTLS.
 
-- Kotlin official code style
-- Consistent formatting via Gradle
-- Package naming: `fi.demo.*`
+## Suomi.fi documentation checked on 24 October 2026
 
-## 📝 Notes
+These official pages were retrieved on that date:
 
-- **No Real Credentials**: This repository contains no real Suomi.fi credentials or proprietary endpoints
-- **Demo JWT**: The JWT decoder accepts unsigned tokens for local testing only (see `DemoJwtDecoder`)
-- **mTLS Stub**: mTLS configuration is scaffolded but not fully implemented (would require proper KeyManager/TrustManager setup)
-- **Production Ready**: Core patterns are production-ready; replace stubs with real implementations
-- **WireMock Ports**: 
-  - External (host): `http://localhost:8089`
-  - Internal (Docker): `http://wiremock:8080`
-  - The default configuration uses the internal Docker port for containerized deployments
+- Technical description (OIDC), updated 7 October 2026: https://kehittajille.suomi.fi/palvelut/tunnistus/tekninen-kuvaus-oidc
+- English introduction: https://kehittajille.suomi.fi/services/e-identification/technical-description
+- Schedule announcement, published 7 October 2026: https://kehittajille.suomi.fi/ajankohtaista/tarkennus-suomi-fi-tunnistuksen-oidc-rajapinnan-julkaisuaikatauluun
+- OIDC interface comparison, updated 7 October 2026: https://kehittajille.suomi.fi/services/e-identification/technical-description/oidc-interface
 
-## 📄 License
+The schedule announcement still says:
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+- OIDC test environment: 3 December 2026
+- OIDC production environment: 28 January 2027
+- SAML transition ends: 1 June 2028
 
-This is a demo repository for educational purposes. The code demonstrates integration patterns for Suomi.fi identity services but does not include any real Suomi.fi credentials or proprietary endpoints.
+The comparison page describes the current identification interface as SAML 2.0, with OIDC using JSON and JWT, trust established through OIDC metadata, and key publication through a `jwks_uri` registered in Suomi.fi Service Management. The technical-description response retrieved on 24 October 2026 was the introduction only. It names authentication steps, metadata, attributes, and key management, and it does not include an endpoint list in the text that was returned. Endpoint URLs, scopes, and claim names from that guide are therefore omitted. Compatibility of this repository with Suomi.fi has not been validated.
 
-## 🤝 Contributing
+Generic OAuth ideas in the browser demo, such as an authorization code, a `state` value, and an access token, are teaching examples. They are not a statement of Suomi.fi requirements. The repository paths `/authorize`, `/oauth/token`, and `/verified-profile` are stub shapes.
 
-This is a demo project. For production use, ensure:
-1. All security measures are properly implemented
-2. Real Suomi.fi credentials are obtained and stored securely
-3. mTLS is fully configured and tested
-4. JWT validation uses Suomi.fi's JWKS endpoint
-5. Comprehensive integration tests are added
+## Observability in the API
 
+Logs include the correlation id from the mapped diagnostic context. Audit rows store `ts`, `actor`, `action`, `target`, `correlation_id`, and `details`. The actor is the authenticated name or `anonymous`. Recorded action names are `AUTH_SESSION_STARTED`, `AUTH_CALLBACK_RECEIVED`, `AUTH_CALLBACK_COMPLETED`, and `PROFILE_FETCHED`.
+
+The browser demo reuses those names when the simulated moment matches. It also writes simulator-only names such as `SIMULATOR_STATE_REJECTED`. Those rows stay in `sessionStorage` for the tab. Reset removes the demo key `suomifi-integration-starter.identity-explorer.v1` and does not clear other storage.
+
+## Project layout
+
+```
+apps/api              Spring Boot service
+libs/suomifi-client   Adapter interface and WebClient implementation
+infra/                Compose file and WireMock mappings
+web/                  Browser-only Identity Integration Explorer
+scripts/              Unsigned demo JWT helpers
+docs/architecture.md  Backend and demo boundaries
+```
+
+## License
+
+MIT. See [LICENSE](LICENSE). This is an educational prototype. It contains demo placeholders only.

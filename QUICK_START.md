@@ -1,6 +1,25 @@
 # Quick Start Guide
 
-## Prerequisites
+This repository is an educational prototype. The API uses local stubs. It does not connect to Suomi.fi, and changing its base URL does not make it a production client. See the README for the browser demo and for the implementation gaps.
+
+## Browser demo
+
+No Java, Docker, or identity provider is required.
+
+```bash
+cd web
+npm ci
+npm test
+npm run dev
+```
+
+Open http://127.0.0.1:5173/suomifi-integration-starter/
+
+The production bundle is `npm run build:demo`, then `npm run preview:demo` at http://127.0.0.1:4173/suomifi-integration-starter/
+
+The demo simulates authentication in the browser. It does not call the API below.
+
+## Backend prerequisites
 
 - Java 21
 - Docker and Docker Compose

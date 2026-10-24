@@ -1,5 +1,8 @@
 name: CI
 
+# Build and test the Suomi.fi integration starter
+# Uses Gradle with Java 21, runs all tests with H2 in-memory database
+
 on:
   push:
     branches: [ main, develop ]
@@ -8,8 +11,10 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     
+    # PostgreSQL service available for potential Testcontainers tests
+    # Note: Current tests use H2 in-memory database (see application-test.yml)
     services:
       postgres:
         image: postgres:16-alpine
