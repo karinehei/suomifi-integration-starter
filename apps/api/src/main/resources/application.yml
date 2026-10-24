@@ -53,7 +53,8 @@ suomifi:
     retry-enabled: true
     max-retry-attempts: 3
     retry-initial-delay-ms: 500
-    # mTLS configuration (for production)
+    # Certificate path fields are unused. SuomifiClientConfiguration.buildSslContext
+    # returns null and does not install a client certificate. See the README.
     # client-certificate-path: classpath:certificates/client.pem
     # client-key-path: classpath:certificates/client-key.pem
     # truststore-path: classpath:certificates/truststore.jks

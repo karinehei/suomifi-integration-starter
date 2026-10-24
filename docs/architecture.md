@@ -1,204 +1,96 @@
 # Architecture
 
-## Overview
+This repository is an educational prototype. The Spring Boot API and adapter exercise a stubbed authorization-code flow against WireMock. The browser app under `web/` is a separate simulator. It does not call the API.
 
-This repository demonstrates a production-ready integration adapter for Suomi.fi identity services. The architecture follows the **Adapter Pattern**, allowing seamless switching between stub implementations (for testing) and real Suomi.fi endpoints (for production).
+Replacing `suomifi.client.base-url` does not turn the stub into a Suomi.fi client. Official onboarding and token validation are not implemented. See the README for what was checked in the public Suomi.fi developer material on 24 October 2026.
 
-## System Architecture
+## Two separate pictures
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Client (Browser/App)                     │
-└────────────────────────────┬────────────────────────────────────┘
-                              │
-                              │ HTTPS + JWT
-                              │
-┌─────────────────────────────▼──────────────────────────────────┐
-│                    API Service (Spring Boot)                     │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  Controllers: /api/v1/auth/*, /api/v1/profile            │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  Security: JWT Validation, Correlation ID Filter         │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  Audit Service: Persists events to PostgreSQL            │  │
-│  └──────────────────────────────────────────────────────────┘  │
-└─────────────────────────────┬──────────────────────────────────┘
-                              │
-                              │ HTTP + mTLS (production)
-                              │ HTTP (local stub)
-                              │
-┌─────────────────────────────▼──────────────────────────────────┐
-│              Suomifi Client Library (Adapter)                    │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  SuomifiAdapter Interface                                 │  │
-│  │  - exchangeAuthorizationCode()                            │  │
-│  │  - fetchVerifiedProfile()                                 │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  WebClientSuomifiAdapter (Implementation)                 │  │
-│  │  - WebClient with mTLS support                            │  │
-│  │  - Retry logic (Resilience4j)                             │  │
-│  │  - Error handling                                         │  │
-│  └──────────────────────────────────────────────────────────┘  │
-└─────────────────────────────┬──────────────────────────────────┘
-                              │
-                    ┌─────────┴─────────┐
-                    │                   │
-        ┌───────────▼──────┐  ┌─────────▼──────────┐
-        │  WireMock Stub   │  │  Suomi.fi (Prod)   │
-        │  (Local Dev)     │  │  (Production)      │
-        └──────────────────┘  └────────────────────┘
+Browser simulator (web/)
+  Walkthrough, inspector, audit trail, architecture, status
+  sessionStorage only
+  No HTTP calls to the API or to an identity provider
+
+Existing backend
+  Browser or curl
+    -> Spring Boot API
+         -> AuthService / ProfileService
+         -> DemoJwtDecoder and CorrelationIdFilter
+         -> AuditService -> PostgreSQL
+         -> SuomifiAdapter
+              -> WebClientSuomifiAdapter (plain HTTP)
+                   -> WireMock /oauth/token and /verified-profile
 ```
 
-## Component Details
+The simulator is not a client of the boxes below it.
 
-### API Service (`apps/api`)
+## API
 
-The main Spring Boot application that provides REST endpoints for authentication and profile management.
+`apps/api` exposes:
 
-**Key Features:**
-- **JWT-based Authentication**: Uses Spring Security OAuth2 Resource Server
-- **Correlation ID Tracking**: Every request gets a correlation ID for distributed tracing
-- **Audit Logging**: All actions are logged to PostgreSQL for compliance
-- **OpenAPI Documentation**: Swagger UI available at `/swagger-ui.html`
+- `GET /api/v1/health`
+- `POST /api/v1/auth/session`
+- `GET /api/v1/auth/callback`
+- `GET /api/v1/profile`
 
-**Endpoints:**
-- `GET /api/v1/health` - Health check
-- `POST /api/v1/auth/session` - Start authentication session
-- `GET /api/v1/auth/callback` - Handle OAuth callback
-- `GET /api/v1/profile` - Get verified profile (requires JWT)
+`SecurityConfiguration` leaves health, Swagger, and the two auth routes open. Other routes require a JWT decoded by `DemoJwtDecoder`. There is no CSRF token because the API is stateless. That is not a substitute for checking the OAuth `state` value. The callback does not perform that check.
 
-### Suomifi Client Library (`libs/suomifi-client`)
+`AuthService.generateAuthUrl` concatenates `baseUrl`, `/authorize`, `response_type=code`, the demo client id, the redirect URI, `state`, and `scope=openid profile`. Nothing in this repository serves that authorize URL. WireMock has no authorize mapping.
 
-A reusable library that implements the adapter pattern for Suomi.fi integration.
+`AuthService.handleCallback` always calls `exchangeAuthorizationCode` and then `fetchVerifiedProfile`. The `state` argument is not compared with a stored value.
 
-**Design Pattern: Adapter**
-- **Interface**: `SuomifiAdapter` defines the contract
-- **Implementation**: `WebClientSuomifiAdapter` provides the concrete implementation
-- **Benefits**: Easy to swap implementations (stub vs. real), testable, maintainable
+`ProfileService.getProfileForSubject` logs that it is using a placeholder and calls the adapter with `demo-access-token`. It does not look up the access token from the callback.
 
-**Key Features:**
-- **mTLS Support**: Configured to support mutual TLS (client certificates)
-- **Retry Logic**: Automatic retries for 5xx errors with exponential backoff
-- **Error Handling**: Typed exceptions for different error scenarios
-- **Configuration**: Externalized via Spring Boot properties
+## Adapter
 
-### Database (PostgreSQL)
+`SuomifiAdapter` declares code exchange and profile fetch. `WebClientSuomifiAdapter` posts form fields to `{baseUrl}/oauth/token` (`grant_type`, `code`, `redirect_uri`, `client_id`, `client_secret`) and sends the access token to `{baseUrl}/verified-profile`. `state` is not placed on the token request.
 
-**Schema:**
-- `audit_event` table stores all audit logs with JSONB details field
-- Entity uses regular class (not data class) for Hibernate compatibility
-- Includes no-arg constructor for JPA requirements
+`TokenResponse` requires `id_token`. The token stub returns one whose signature segment is the text `signature-placeholder`. The callback DTO returned to the caller keeps `accessToken` and a profile map. It does not return or validate the ID token. The authorize URL does not include `nonce`.
 
-**Migrations:**
-- Managed by Flyway
-- Located in `apps/api/src/main/resources/db/migration/`
-- Production uses JSONB column type
-- Tests use H2 with compatible schema (JSONB mapped to JSON/CLOB)
+Retries: when enabled, HTTP 5xx `WebClientResponseException` responses are retried up to `max-retry-attempts`, waiting `retry-initial-delay-ms` each time. That wait is fixed. The predicate also mentions `SuomifiNetworkException`, but `onErrorMap` creates that type after the retry operator, so connection failures are not selected for retry.
 
-### WireMock Stub
+mTLS: `SuomifiClientProperties` can hold certificate paths. `SuomifiClientConfiguration.buildSslContext` returns null even when those paths are set. `loadPrivateKey` throws `UnsupportedOperationException`. The `WebClient` connector is plain HTTP. Setting the properties does not enable mutual TLS.
 
-Local stub service that simulates Suomi.fi endpoints:
-- `POST /oauth/token` - Token exchange
-- `GET /verified-profile` - Profile retrieval
+Errors: 401 and 403 become `SuomifiAuthException`. HTTP 5xx and other transport failures become `SuomifiNetworkException`. `SuomifiParseException` exists as a type. The inspected API has no `ControllerAdvice`, so adapter failures do not have a documented JSON error body.
 
-## Security Architecture
+## Tokens
 
-### Authentication Flow
+`DemoJwtDecoder` requires three dot-separated segments, decodes the first two as base64url JSON, and rejects a past `exp` when that claim exists. The third segment is ignored. This is parsing, not signature verification.
 
-1. **Session Start**: Client calls `POST /api/v1/auth/session`
-   - API generates state and returns auth URL
-   - Audit event: `AUTH_SESSION_STARTED`
+`GET /api/v1/profile` is the route that uses that decoder. The callback path does not. An expired resource-server token would fail in the decoder before `ProfileController` runs. The decoder would still not prove the token was signed.
 
-2. **User Authentication**: User authenticates with Suomi.fi (or stub)
-   - User redirected to Suomi.fi
-   - User provides credentials
-   - Suomi.fi redirects back with authorization code
+## Audit storage
 
-3. **Callback Handling**: Client calls `GET /api/v1/auth/callback?code=...&state=...`
-   - API validates state
-   - API exchanges code for tokens via `SuomifiAdapter`
-   - API fetches verified profile
-   - Audit event: `AUTH_CALLBACK_COMPLETED`
+`AuditService` saves `actor`, `action`, `target`, `correlationId`, and `details` to `audit_event`. Flyway creates the table with JSONB details in PostgreSQL. The actor comes from the security context, or `anonymous`. `CorrelationIdFilter` supplies the id from `X-Correlation-Id` or a new UUID, and copies it to the response.
 
-4. **Profile Access**: Client calls `GET /api/v1/profile` with JWT
-   - API validates JWT
-   - API fetches profile from Suomi.fi (or cache)
-   - Audit event: `PROFILE_FETCHED`
+Action names written by the API:
 
-### Security Measures
+- `AUTH_SESSION_STARTED`
+- `AUTH_CALLBACK_RECEIVED`
+- `AUTH_CALLBACK_COMPLETED`
+- `PROFILE_FETCHED`
 
-1. **mTLS (Mutual TLS)**: Client certificates for Suomi.fi communication
-2. **JWT Validation**: Tokens validated before access to protected resources
-3. **State Parameter**: CSRF protection in OAuth flow
-4. **Audit Logging**: All actions logged with actor, timestamp, correlation ID
-5. **Correlation IDs**: Request tracing across services
+`AUTH_CALLBACK_COMPLETED` is written only after `handleCallback` returns. That method has already exchanged the code and fetched the stub profile. The browser demo splits those moments for inspection and labels the difference on the audit row.
 
-## Configuration
+Tests use H2 with Flyway disabled. The Compose stack uses PostgreSQL 16.
 
-### Local Development
+## WireMock
 
-- **Database**: PostgreSQL via Docker Compose
-- **Suomi.fi**: WireMock stub via Docker Compose
-- **JWT**: Demo decoder accepts unsigned tokens (for testing only)
+`infra/wiremock/mappings/token-exchange.json` answers `POST /oauth/token`. `verified-profile.json` answers `GET /verified-profile` for any bearer token. Both are fixtures. They are not a Suomi.fi contract. The profile fixture is sample data for the stub, not data used by the browser demo. The demo uses fictional personas such as `DEMO-PERSON-001`.
 
-### Production
+## Browser simulator
 
-To switch to real Suomi.fi:
+`web/` is a Vite app with hash routing and base path `/suomifi-integration-starter/`. Scenario logic lives behind `createIdentitySimulator`. Components render its snapshot.
 
-1. Update `suomifi.client.base-url` to Suomi.fi endpoint
-2. Configure mTLS certificates:
-   - `suomifi.client.client-certificate-path`
-   - `suomifi.client.client-key-path`
-   - `suomifi.client.truststore-path`
-3. Replace `DemoJwtDecoder` with proper JWKS-based decoder
-4. Configure real OAuth2 client credentials
+The state machine can succeed, cancel, reject a mismatched callback state before exchange, deny a profile step when the illustrative `exp` is in the past, or record a timeout without a network request. Reset clears the versioned `sessionStorage` key for this demo and cancels a pending timeout. Malformed or unknown stored JSON is ignored. If `sessionStorage` throws, the page keeps history in memory.
 
-## Observability
+The architecture and status views in the demo repeat the boundaries above and link to the files that support each status. They do not assign a readiness score.
 
-### Logging
-
-- Structured logging with correlation IDs
-- Log levels configurable via `application.yml`
-- MDC (Mapped Diagnostic Context) for correlation ID propagation
-
-### Metrics
-
-- Spring Boot Actuator endpoints
-- Health checks at `/actuator/health`
-
-### Audit Trail
-
-- All actions persisted to `audit_event` table
-- Queryable by correlation ID, actor, timestamp
-- JSONB details field for flexible metadata storage
-
-## Testing Strategy
-
-1. **Unit Tests**: 
-   - Adapter tests using WireMock standalone
-   - Controller tests using `@WebMvcTest` with mocked services
-   - All tests use H2 in-memory database for speed
-2. **Integration Tests**: 
-   - Full Spring Boot context with `@SpringBootTest`
-   - H2 database for test isolation
-   - MockMvc for HTTP testing
-3. **Local Testing**: Full stack via Docker Compose
-4. **CI/CD**: Automated tests in GitHub Actions with PostgreSQL service container
-
-## Deployment
-
-### Local Development
+## Local stack
 
 ```bash
 docker compose -f infra/docker-compose.yml up
 ```
 
-### Production
-
-1. Build Docker image: `docker build -f apps/api/Dockerfile -t suomifi-api .`
-2. Deploy with orchestration (Kubernetes, ECS, etc.)
-3. Configure environment variables for production settings
-4. Set up monitoring and alerting
+That starts PostgreSQL, WireMock, and the API. It does not start the browser demo. Use the `web/` commands in the README for the simulator.

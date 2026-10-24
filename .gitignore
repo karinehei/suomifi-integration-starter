@@ -48,3 +48,7 @@ application-local.properties
 
 # Docker
 docker-compose.override.yml
+
+# Browser demo
+web/node_modules/
+web/dist/
